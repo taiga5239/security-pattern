@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdp-service
+  namespace: security-pattern
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pdp-service
+  template:
+    metadata:
+      labels:
+        app: pdp-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: pdp
+          image: security-pattern-pdp-service:latest
+          ports:
+            - containerPort: 8001
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdp-service
+  namespace: security-pattern
+spec:
+  selector:
+    app: pdp-service
+  ports:
+    - port: 8001
+      targetPort: 8001
+  type: ClusterIP

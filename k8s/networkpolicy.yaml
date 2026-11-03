@@ -1,0 +1,150 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: security-pattern
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Точки входа для внешних клиентов (NodePort, port-forward)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-entry
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [api-gateway, auth-service, grafana]
+  policyTypes: [Ingress]
+  ingress:
+    - {}
+---
+# PDP принимает запросы только от шлюза (PEP)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pdp-from-gateway
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchLabels:
+      app: pdp-service
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+      ports:
+        - port: 8001
+---
+# PAP доступен только контроллеру PDP
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pap-from-pdp
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchLabels:
+      app: pap-service
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pdp-service
+      ports:
+        - port: 8004
+---
+# Хранилище: чтение данных только от шлюза, служебный запрос ACL к мастеру Cypress только от PDP
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ytsaurus-internal-only
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchLabels:
+      app: ytsaurus-cluster
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+        - podSelector:
+            matchLabels:
+              app: pdp-service
+      ports:
+        - port: 8003
+---
+# Аудит принимает события только от сервисов паттерна
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-audit-from-pattern
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchLabels:
+      app: audit-service
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+        - podSelector:
+            matchLabels:
+              app: pdp-service
+        - podSelector:
+            matchLabels:
+              app: pap-service
+      ports:
+        - port: 8005
+---
+# Сбор метрик: Prometheus опрашивает только PDP и audit
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-scrape
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [pdp-service, audit-service]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 8001
+        - port: 8005
+---
+# Grafana обращается только к Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-from-grafana
+  namespace: security-pattern
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - port: 9090

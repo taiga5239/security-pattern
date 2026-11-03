@@ -1,0 +1,82 @@
+name: security-pattern
+
+services:
+  api-gateway:
+    build: ./gateway
+    container_name: api-gateway-pep
+    ports:
+      - "8000:8000"
+    depends_on:
+      - pdp-service
+      - audit-service
+    restart: unless-stopped
+
+  pdp-service:
+    build: ./pdp
+    container_name: pdp-service
+    ports:
+      - "8001:8001"
+    depends_on:
+      - pap-service
+      - ytsaurus-cluster
+      - audit-service
+    restart: unless-stopped
+
+  auth-service:
+    build: ./auth
+    container_name: auth-service
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+
+  ytsaurus-cluster:
+    build: ./ytsaurus
+    container_name: ytsaurus-cluster
+    ports:
+      - "8003:8003"
+    restart: unless-stopped
+
+  pap-service:
+    build: ./pap
+    container_name: pap-service
+    ports:
+      - "8004:8004"
+    depends_on:
+      - audit-service
+    restart: unless-stopped
+
+  audit-service:
+    build: ./audit
+    container_name: audit-service
+    ports:
+      - "8005:8005"
+    environment:
+      AUDIT_DB: /data/audit.db
+    volumes:
+      - audit_data:/data
+    restart: unless-stopped
+
+  prometheus-monitor:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus-monitor
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  grafana-dashboard:
+    image: grafana/grafana:11.1.0
+    container_name: grafana-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml:ro
+    depends_on:
+      - prometheus-monitor
+    restart: unless-stopped
+
+volumes:
+  audit_data:

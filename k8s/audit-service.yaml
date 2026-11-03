@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service
+  namespace: security-pattern
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: audit-service
+  template:
+    metadata:
+      labels:
+        app: audit-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001          # emptyDir /data доступен на запись пользователю 10001
+      containers:
+        - name: audit
+          image: security-pattern-audit-service:latest
+          ports:
+            - containerPort: 8005
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: AUDIT_DB
+              value: /data/audit.db
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-service
+  namespace: security-pattern
+spec:
+  selector:
+    app: audit-service
+  ports:
+    - port: 8005
+      targetPort: 8005
+  type: ClusterIP

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ytsaurus-cluster
+  namespace: security-pattern
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ytsaurus-cluster
+  template:
+    metadata:
+      labels:
+        app: ytsaurus-cluster
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: ytsaurus
+          image: security-pattern-ytsaurus-cluster:latest
+          ports:
+            - containerPort: 8003
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ytsaurus-cluster
+  namespace: security-pattern
+spec:
+  selector:
+    app: ytsaurus-cluster
+  ports:
+    - port: 8003
+      targetPort: 8003
+  type: ClusterIP

@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 2s     # Собирать метрики каждые 2 секунды (для быстрых тестов)
+
+scrape_configs:
+  - job_name: 'pdp-security-metrics'
+    static_configs:
+      - targets: ['pdp-service:8001']
